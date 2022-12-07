@@ -1,7 +1,9 @@
-###Базовые действия
+### Базовые действия
 
-####Создание целевой функции для минимизации
-''' from qubovert import boolean_var
+#### Создание целевой функции для минимизации
+'''
+
+from qubovert import boolean_var
 
 N = 10
 
@@ -19,5 +21,7 @@ model.add_constraint_eq_XOR(x[1], x[3], x[5], lam=3)
 
 # subject to the constraints that the sum of all variables is less than 4
 # enforce with a penalty factor of 5
-model.add_constraint_lt_zero(sum(x.values()) - 4, lam=5)'''
+model.add_constraint_lt_zero(sum(x.values()) - 4, lam=5)
+
+'''
 
