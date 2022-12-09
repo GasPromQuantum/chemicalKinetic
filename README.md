@@ -9,7 +9,7 @@ chemkin_rms_second_order.py - МНК для химической реакции 
 
 Задачи:
 
-- [x]
+- [ x ]
 
 []
 
