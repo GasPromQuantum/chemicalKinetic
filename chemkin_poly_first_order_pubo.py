@@ -1,69 +1,48 @@
 import json
-import numpy as np
 import scipy.special
 import qubovert as qv
+from typing import List
 import matplotlib.pyplot as plt
-import time
+from utils import get_mininization_func
 
-start_time = time.time()
 
-with open('Data/ChemKin/first_order.json') as f:
-    data = json.load(f)
+def k_pows_list(k: qv._pubo.PUBO, n_pows: int) -> List[qv._pubo.PUBO]:
+    temp = qv.PUBO()
+    temp[()] = 1
+    return [temp] + [k**j for j in range(1, n_pows)]
 
-exp_time = np.array(data['time'])
-con = np.array(data['concentrations'])
-N = len(exp_time) - 1
-M = len(con[0])
-K = 1  # number of k's
-n = 9  # digits in k  + 1
 
-N_add = 7 # number of segments between [\tau_{i}, \tau_{i+1}]
-          # todo: choose with |1-kdt*dT|<1 && dt< min(dT_i) !!!
-# dT = 1
-# r = int(dT/dt)
-k_min = 0.125
-k_max = 2
+def main():
+    with open('first_order.json') as f:
+        data = json.load(f)
 
-k_vars = [qv.PUBO.create_var('k%d' % i) for i in range(n)] #(1,n)???
-k = - (k_min + (k_max - k_min)*sum((0.5 ** i) * k_vars[i] for i in range(1,n))) #(1,n)???
-print(k_vars)
-print(k)
+        time = data['time']
+        con = data['concentrations']
 
-temp = 1
-k_pows = []
-for i in range(N_add+1):
-    k_pows.append(temp)
-    temp *= k
+        N = len(time)  # number of experimental points
+        n = 10  # number of binary digits, representing k
+        # number of additional dots between each pair of experimental dots
+        # todo: choose with |1-kdt*dT|<1 && dt< min(dT_i)
+        N_add = 4
 
-F = 0
-for i in range(1, N + 1):
-    delta = con[i][0]
-    dt = (exp_time[i]-exp_time[i-1]) / N_add
-    for j in range(7):
-        C = scipy.special.binom(N_add + 1, j)
-        delta -= C * con[i - 1][0] * (dt**j) * k_pows[j]
-    F += delta ** 2
+        k_bin = [qv.PUBO.create_var('k%d' % i) for i in range(n)]
+        k_dec = -sum((0.5 ** i) * k_bin[i] for i in range(n))
+        k_pows = k_pows_list(k_dec, N_add+2)
 
-print("F =", F)
+        F = get_mininization_func(con, time, k_pows, N, N_add)
+        res = qv.sim.anneal_pubo(F, num_anneals=1000)
 
-int_F = F.to_pubo()
-print("\nF vars:", F.variables)
-print("int_F vars:", int_F.variables)
-print("degree =",F.degree)
+        F_solution = res.best.state
+        print("\nF_solution =", F_solution)
+        print("k =", k_dec.value(F_solution))
+        print("F(k) =", F.value(F_solution))
 
-print("\nanneal_pubo solution:")
-res = qv.sim.anneal_pubo(F, num_anneals=1000)
-end_time = time.time()
-print("--- %s seconds ---" % (end_time - start_time))
-print(res.best)
+        plt.hist([sample.value for sample in res])
+        plt.xlabel("$F$")
+        plt.ylabel("counts")
+        plt.title("Values of $F$ sampled")
+        plt.show()
 
-F_solution = res.best.state
-print("\nF_solution =", F_solution)
-print("k =", k.value(F_solution))
-print("F(k) =", F.value(F_solution))
 
-plt.hist([sample.value for sample in res])
-plt.xlabel("$F$")
-plt.ylabel("counts")
-plt.title("Values of $F$ sampled")
-plt.show()
+if __name__ == "__main__":
+    main()
