@@ -30,7 +30,7 @@ def main():
         k_pows = k_pows_list(k_dec, N_add+2)
 
         F = get_mininization_func(con, time, k_pows, N, N_add)
-        res = qv.sim.anneal_pubo(F, num_anneals=1000)
+        res = qv.sim.anneal_pubo(F, num_anneals=10)
 
         F_solution = res.best.state
         print("\nF_solution =", F_solution)
@@ -38,6 +38,22 @@ def main():
         print("F(k) =", F.value(F_solution))
 
         plt.hist([sample.value for sample in res])
+        plt.xlabel("$F$")
+        plt.ylabel("counts")
+        plt.title("Values of $F$ sampled")
+        plt.show()
+
+        F_qubo = F.to_qubo()
+        F_qubo_solution = qv.sim.anneal_qubo(F_qubo, num_anneals=1000)
+        res_qubo = F_qubo_solution.best.state
+        print(type(res_qubo))
+        res_pubo_from_qubo = F.convert_solution(res_qubo)
+
+        print("\nF_solution =", res_pubo_from_qubo)
+        print("k =", k_dec.value(res_pubo_from_qubo))
+        print("F(k) =", F.value(res_pubo_from_qubo))
+
+        plt.hist([sample.value for sample in F_qubo_solution])
         plt.xlabel("$F$")
         plt.ylabel("counts")
         plt.title("Values of $F$ sampled")
