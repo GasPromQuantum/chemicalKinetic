@@ -4,39 +4,34 @@ import scipy.special
 import qubovert as qv
 import matplotlib.pyplot as plt
 import time
+from utils import get_mininization_func
 
 start_time = time.time()
 
-with open('Data/ChemKin/first_order.json') as f:
+with open('first_order.json') as f:
     data = json.load(f)
 
 exp_time = np.array(data['time'])
 con = np.array(data['concentrations'])
-N = len(exp_time) - 1
-M = len(con[0])
-K = 1  # number of k's
-n = 5  # digits in k  + 1
+N_exp = len(exp_time)
+n = 9  # digits in k  + 1
 
-N_add = 2 # number of segments between [\tau_{i}, \tau_{i+1}]
+N_add = 10 # number of additional dots between each pair of experimental dots
           # todo: choose with |1-kdt*dT|<1 && dt< min(dT_i) !!!
-# dT = 1
-# r = int(dT/dt)
-k_min = 0.125
-k_max = 2
 
-k_vars = [[qv.PUBO.create_var("k" + str(i) + str(j)) for i in range(n)] for j in range(N_add + 1)]
-k = [0] * (N_add + 1)
-for j in range(N_add + 1):
-    k[j] = - (k_min + (k_max - k_min)*sum((0.5 ** i) * k_vars[j][i] for i in range(1, n)))
+reg_koeff = 100000
 
-F = 0
-for i in range(1, N + 1):
-    delta = con[i][0]
-    dt = (exp_time[i]-exp_time[i-1]) / N_add
-    for j in range(N_add + 1):
-        C = scipy.special.binom(N_add + 1, j)
-        delta -= C * con[i - 1][0] * (dt**j) * k[j]
-    F += delta ** 2
+k_vars = [[qv.QUBO.create_var('k%d%d' %(i, j)) for i in range(n)] for j in range(N_add + 2)]
+k_vars = np.array(k_vars)
+print("k_vars_shape = ", k_vars.shape)
+k_pows = list()
+for j in range(N_add + 2):
+    k_pows.append(((-1)**j)*sum((0.5 ** i) * k_vars[j][i] for i in range(n)))
+
+F = get_mininization_func(con, exp_time, k_pows, N_exp, N_add)
+
+F += reg_koeff*(k_pows[0] - 1)**2
+F += reg_koeff*sum((k_pows[j] - k_pows[1])**2 for j in range(1, N_add+2))
 
 int_F = F.to_qubo()
 res = qv.sim.anneal_qubo(F, num_anneals=1000)
@@ -46,7 +41,7 @@ print(res.best)
 
 F_solution = res.best.state
 print("\nF_solution =", F_solution)
-print("k =", k[0].value(F_solution))
+print("k = ", -k_pows[0].value(F_solution))
 print("F(k) =", F.value(F_solution))
 
 plt.hist([sample.value for sample in res])
